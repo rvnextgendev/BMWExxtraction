@@ -1,0 +1,17 @@
+name: Build .NET 10 on Windows
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore BMWExxtraction.sln
+      - name: Build
+        run: dotnet build BMWExxtraction.sln --no-restore --configuration Release

@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+TestResults/
+outputs/
+*.user
+*.suo
+*.cache
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.pfx
+.env
