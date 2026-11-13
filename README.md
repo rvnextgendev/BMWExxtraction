@@ -1,57 +1,52 @@
-# BMW ISTA Extraction — Discovery Agent
+# BMW ISTA Extraction — Local-first .NET 10
 
-A Windows-only **.NET 10 / C# / FlaUI** proof of concept for discovering UI Automation controls exposed by a locally installed BMW ISTA application.
+A Windows/.NET 10 BMW ISTA extraction project, built in stages. **The current modules import references, prepare jobs, and inspect ISTA controls. They do not yet perform automated ISTA searches or extract diagnostic results.**
 
-> **Scope:** Read-only UI Automation discovery. It does not enter VIN/DTC values, click buttons, bypass login controls, or claim to extract diagnostic content from unknown ISTA screens. Run with authorization on your own installation. Review captured values before sharing, as they may contain VINs or other sensitive information.
+## Projects
+- `BMW.ISTA.Core` — VIN/DTC models, validation, atomic JSON storage
+- `BMW.ISTA.Excel` — streaming MINI/VIN and generic DTC workbook import
+- `BMW.ISTA.Console` — CLI to prepare filtered pending jobs and JSON files
+- `BMW.ISTA.Discovery` — read-only FlaUI/UIA3 ISTA control-tree capture
+- `BMW.ISTA.Tests` — input validation and JSON persistence tests
 
 ## Prerequisites
-- Windows 10/11 and .NET 10 SDK
-- ISTA installed and already running in the same interactive desktop session
-- Sufficient permission to inspect the ISTA process (normal user preferred; match privilege level if needed)
-- Optional: FlaUInspect, to inspect selectors interactively
+Windows 10/11, .NET 10 SDK, and running ISTA for UI discovery. The Excel reader also runs without ISTA.
 
-## Setup
 ```powershell
 git clone https://github.com/rvnextgendev/BMWExxtraction.git
 cd BMWExxtraction
 dotnet restore BMWExxtraction.sln
 dotnet build BMWExxtraction.sln
+dotnet test BMWExxtraction.sln
 ```
 
-List windows:
+## Step 1: Generate JSON using Excel input
+The MINI workbook contains YEAR, MAKE, MODEL, ENGINE, TYPE and VIN. The DTC workbook has a worksheet named P0000-U3FFF with code in column C and description in column D. The importer reads these locally; do not upload source workbooks to this public repo.
+
+```powershell
+dotnet run --project src/BMW.ISTA.Console -- --mini "C:\Data\MINI.xlsx" --dtc "C:\Data\DTC.xlsx" --code P0302 --out outputs/p0302
+```
+
+For a VIN-specific pending job:
+```powershell
+dotnet run --project src/BMW.ISTA.Console -- --mini "C:\Data\MINI.xlsx" --dtc "C:\Data\DTC.xlsx" --code P0302 --vin WMZ53GA05T7U74204 --out outputs/p0302-mini
+```
+
+Writes `vehicles.json`, `dtcs.json`, `jobs.json` and `summary.json`. Jobs have `pending` status; they **are not ISTA extraction results**.
+
+## Step 2: Inspect ISTA controls (Windows only)
 ```powershell
 dotnet run --project src/BMW.ISTA.Discovery -- --list-windows
+dotnet run --project src/BMW.ISTA.Discovery -- --pid 7716 --label initial --max-depth 8 --max-nodes 3000
 ```
+Replace PID with actual ISTA process ID. Add `--include-values` only for authorized sensitive-text capture. Output: `outputs/<label>-<timestamp>.json`.
 
-Capture by process ID:
-```powershell
-dotnet run --project src/BMW.ISTA.Discovery -- --pid 7716 --label results-P0302 --include-values
-```
+## Planned later
+After verifying real UI automation selectors: read input jobs, navigate the ISTA fault-code/VIN search, capture result records and linked navigation, add resilient retries and explicit authorization controls; then add SQLite using an approved schema. Generic DTC definitions must not be misrepresented as ISTA-specific results.
 
-Or match the main window title:
-```powershell
-dotnet run --project src/BMW.ISTA.Discovery -- --title ISTA --label initial-scan
-```
+See [architecture](docs/ARCHITECTURE.md) and [examples](docs/EXAMPLES.md).
 
-Output goes to `outputs/<label>-<UTC timestamp>.json` by default. Override with `--output C:\temp\ista.json`. Use `--max-depth 8` and `--max-nodes 3000` to limit capture; `--include-values` captures the text of ValuePattern where available, so keep it off unless required. `--help` shows all options.
+## Privacy and security
+Public repository; keep license-bound BMW content, VINs, workbooks and JSON outputs local. `outputs/` and `*.xlsx` are ignored. UI discovery may fail for custom controls. Do not attempt access beyond permitted applications or data.
 
-## What the JSON contains
-Metadata (capture timestamp, selected process ID, window title), an accessible control tree with Name, AutomationId, ClassName, ControlType, IsEnabled, BoundingRectangle, and optional ValuePattern text. Per-element failures are recorded as errors rather than aborting the entire capture.
-
-## Roadmap
-1. **Discovery (this repo):** map ISTA screens and export JSON without interacting.
-2. **Selector mapping:** compare captures before and after manually opening VIN/DTC search results; identify reliable AutomationIds, labels, tables and navigation.
-3. **Authorized input automation:** implement VIN/fault-code entry only after real selector evidence is provided; include explicit guards, waits, retries and human supervision.
-4. **Data pipeline:** normalize extracted records to JSON first, then add SQLite mapping using an agreed schema; SQL Server export later.
-
-## Safety and limitations
-ISTA may use custom Chromium, WPF, Win32 or owner-drawn controls which are not visible to UIA. FlaUI cannot guarantee access to their content. Screens may include customer data or restricted/licensed BMW information; do not commit captured JSON. This repo deliberately excludes generated outputs and binaries.
-
-## Troubleshooting
-- If no window is found, start ISTA first, then run `--list-windows` and use its PID.
-- If a window exposes few children, inspect with FlaUInspect and verify UIA3 vs legacy accessibility; some content cannot be obtained through UIA.
-- The discovery agent never interacts with controls. Run it in the same Windows session and privilege level as ISTA.
-- Dependency alerts: use current compatible packages and review any GitHub Dependabot alerts; avoid adding legacy `System.Drawing.Common` 5.0.2 explicitly.
-
-## License
-MIT. See LICENSE.
+MIT license.

@@ -5,6 +5,9 @@ obj/
 .idea/
 TestResults/
 outputs/
+*.xlsx
+*.xls
+*.csv
 *.user
 *.suo
 *.cache
